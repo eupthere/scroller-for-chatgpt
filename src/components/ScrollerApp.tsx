@@ -15,24 +15,23 @@ export function ScrollerApp() {
     const domArticles = domArticlesRef.current;
     if (!domArticles.length) return -1;
     
-    const middle = window.innerHeight / 2;
-    let closestIndex = 0;
-    let minDistance = Infinity;
-
+    // ChatGPT frequently uses nested scroll containers
+    const header = document.getElementById('page-header');
+    const focalPoint = header ? header.getBoundingClientRect().bottom : 80;
+    
+    // We add a tiny 2px buffer to handle floating point sub-pixel rounding
+    // during smooth scrolling that can cause the browser to stop at 80.0001
     for (let i = 0; i < domArticles.length; i++) {
       const rect = domArticles[i].getBoundingClientRect();
-      const distance = Math.abs(rect.top + rect.height / 2 - middle);
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestIndex = i;
+      
+      // The "active" article is the first one whose bottom extends past our focal point.
+      // This means we are currently reading it, or it is the first thing appearing below the header.
+      if (rect.bottom > focalPoint + 2) {
+        return i;
       }
     }
 
-    // If we are significantly scrolled above the first message, return -1 so that Down arrow goes to 0.
-    if (closestIndex === 0 && domArticles[0].getBoundingClientRect().top > middle + 200) {
-      return -1;
-    }
-    return closestIndex;
+    return domArticles.length - 1;
   }, []);
 
   // Update indices based on scroll
@@ -52,9 +51,28 @@ export function ScrollerApp() {
     setActiveIndex(targetIndex);
     
     const el = domArticles[targetIndex];
-    el.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center'
+    
+    // Explicitly calculate scroll target to prevent jumping
+    const header = document.getElementById('page-header');
+    const focalPoint = header ? header.getBoundingClientRect().bottom : 80;
+    
+    // ChatGPT frequently uses nested scroll containers, find the actual parent that handles our overflow
+    const getScrollParent = (node: HTMLElement | null): Element | Window => {
+      if (!node || node === document.body || node === document.documentElement) return window;
+      const overflowY = window.getComputedStyle(node).overflowY;
+      if (overflowY === 'auto' || overflowY === 'scroll') return node;
+      return getScrollParent(node.parentElement);
+    };
+
+    const scrollContainer = getScrollParent(el);
+    const rectTop = el.getBoundingClientRect().top;
+    
+    // We want the element's top to hit the focal point perfectly.
+    const distanceToScroll = rectTop - focalPoint;
+
+    scrollContainer.scrollBy({
+      top: distanceToScroll,
+      behavior: 'instant'
     });
 
     // Flash outline
