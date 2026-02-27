@@ -1,4 +1,4 @@
-
+import '~/assets/tailwind.css';
 
 export default defineContentScript({
   matches: ['*://chatgpt.com/*'],
@@ -9,63 +9,35 @@ export default defineContentScript({
     let articles: HTMLElement[] = [];
     const timelineContainer = document.createElement('div');
     timelineContainer.id = 'chatgpt-scroller-timeline';
-    document.body.appendChild(timelineContainer);
 
-    // CSS for timeline
-    const style = document.createElement('style');
-    style.textContent = `
-      #chatgpt-scroller-timeline {
-        position: fixed;
-        left: 16px;
-        top: 50%;
-        transform: translateY(-50%);
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        z-index: 9999;
-        pointer-events: auto;
-        padding: 10px;
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border-radius: 20px;
-        max-height: 80vh;
-        overflow-y: auto;
-        opacity: 0.3;
-        transition: opacity 0.3s;
+    function mountTimeline() {
+      if (!document.body.contains(timelineContainer)) {
+        document.body.appendChild(timelineContainer);
       }
-      #chatgpt-scroller-timeline:hover {
-        opacity: 1;
+      return true;
+    }
+
+    timelineContainer.className = 'fixed top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[9999] pointer-events-auto p-2.5 bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-2xl max-h-[80vh] overflow-y-auto opacity-30 hover:opacity-100 transition-opacity duration-300';
+    timelineContainer.style.left = '16px'; // Default fallback
+
+    function updateTimelinePosition() {
+      const thread = document.getElementById('thread');
+      if (thread) {
+        const rect = thread.getBoundingClientRect();
+        // Position it just inside the left edge of the thread container
+        // or slightly outside depending on available space.
+        // Let's place it 16px from the left edge of the thread if visible,
+        // or fallback to viewport edge if it's too snug.
+        const targetLeft = Math.max(16, rect.left + 16);
+        timelineContainer.style.left = `${targetLeft}px`;
       }
-      @media (prefers-color-scheme: dark) {
-        #chatgpt-scroller-timeline {
-          background: rgba(0, 0, 0, 0.2);
-        }
-      }
-      .timeline-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background-color: #ccc;
-        cursor: pointer;
-        transition: transform 0.2s, background-color 0.2s;
-      }
-      .timeline-dot:hover {
-        transform: scale(1.5);
-        background-color: #888;
-      }
-      .timeline-dot.active {
-        background-color: #10a37f; /* ChatGPT green */
-        transform: scale(1.3);
-      }
-      .timeline-dot.user {
-        border-radius: 4px; /* visually distinguish user messages */
-      }
-    `;
-    document.head.appendChild(style);
+    }
 
     function updateArticles() {
-      // Find all conversation items. They are inside div[data-testid^="conversation-turn"] usually, or article tags.
-      articles = Array.from(document.querySelectorAll('article[data-testid^="conversation-turn"]'));
+      if (!mountTimeline()) return;
+      updateTimelinePosition();
+      // Find all conversation turns by searching for any element with the relevant data-testid prefix.
+      articles = Array.from(document.querySelectorAll('[data-testid^="conversation-turn"]'));
       renderTimeline();
       updateActiveTimelineDot();
     }
@@ -74,16 +46,21 @@ export default defineContentScript({
       timelineContainer.innerHTML = '';
       articles.forEach((article, index) => {
         const dot = document.createElement('div');
-        dot.className = 'timeline-dot';
-        
+
+        // Base tailwind classes for the dot
+        let dotClasses = 'w-[10px] h-[10px] bg-[#ccc] cursor-pointer transition-all duration-200 hover:scale-150 hover:bg-[#888] chatgpt-scroller-dot'; // Added a common class for selection
+
         // Check if it's a user or assistant message
         const role = article.getAttribute('data-turn') || article.querySelector('[data-message-author-role]')?.getAttribute('data-message-author-role');
         if (role === 'user') {
-          dot.classList.add('user');
+          dotClasses += ' rounded-md'; // User messages are square-ish
           dot.title = 'User';
         } else {
+          dotClasses += ' rounded-full'; // Assistant messages are full circles
           dot.title = 'ChatGPT';
         }
+
+        dot.className = dotClasses;
 
         dot.addEventListener('click', () => {
           focusArticle(index);
@@ -94,12 +71,14 @@ export default defineContentScript({
     }
 
     function updateActiveTimelineDot() {
-      const dots = timelineContainer.querySelectorAll('.timeline-dot');
+      const dots = timelineContainer.querySelectorAll('.chatgpt-scroller-dot');
       dots.forEach((dot, index) => {
         if (index === currentIndex) {
-          dot.classList.add('active');
+          dot.classList.add('bg-[#10a37f]', 'scale-125'); // Active state
+          dot.classList.remove('bg-[#ccc]');
         } else {
-          dot.classList.remove('active');
+          dot.classList.remove('bg-[#10a37f]', 'scale-125');
+          dot.classList.add('bg-[#ccc]');
         }
       });
     }
@@ -107,7 +86,7 @@ export default defineContentScript({
     function getCurrentVisibleIndex(): number {
       if (!articles.length) return -1;
       const middle = window.innerHeight / 2;
-      
+
       let closestIndex = 0;
       let minDistance = Infinity;
 
@@ -118,6 +97,11 @@ export default defineContentScript({
           minDistance = distance;
           closestIndex = i;
         }
+      }
+
+      // If we are significantly scrolled above the first message, return -1 so that Down arrow goes to 0.
+      if (closestIndex === 0 && articles[0].getBoundingClientRect().top > middle + 200) {
+        return -1;
       }
       return closestIndex;
     }
@@ -130,28 +114,41 @@ export default defineContentScript({
       }
     }
 
+    // Keep track of any active timeout to prevent lingering outlines from interrupted highlights
+    let outlineTimeout: ReturnType<typeof setTimeout>;
+
     function focusArticle(index: number) {
       if (!articles.length) return;
       currentIndex = Math.max(0, Math.min(index, articles.length - 1));
-      
+
       const el = articles[currentIndex];
       el.scrollIntoView({
         behavior: 'smooth',
         block: 'center'
       });
-      
+
       updateActiveTimelineDot();
-      
+
       // Flash outline
-      const originalOutline = el.style.outline;
+      if (outlineTimeout) {
+        clearTimeout(outlineTimeout);
+        // Clear all previous outlines before applying new ones
+        articles.forEach(a => {
+          a.style.outline = '';
+          a.style.outlineOffset = '';
+          a.style.transition = '';
+        });
+      }
+
       el.style.outline = '2px solid rgba(16, 163, 127, 0.5)';
       el.style.outlineOffset = '4px';
       el.style.transition = 'outline 0.3s ease-out';
-      
-      setTimeout(() => {
-        el.style.outline = '2px solid rgba(16, 163, 127, 0)';
+
+      outlineTimeout = setTimeout(() => {
+        el.style.outline = '2px solid transparent';
         setTimeout(() => {
-          el.style.outline = originalOutline;
+          el.style.outline = '';
+          el.style.outlineOffset = '';
           el.style.transition = '';
         }, 300);
       }, 500);
@@ -183,7 +180,7 @@ export default defineContentScript({
       // Small debounce for scroll
       requestAnimationFrame(syncIndexWithScroll);
     }, { passive: true });
-    
+
     // Some internal scrolling occurs on the application's specific containers, not window
     document.addEventListener('scroll', (e) => {
       if ((e.target as HTMLElement).tagName !== 'TEXTAREA') {
