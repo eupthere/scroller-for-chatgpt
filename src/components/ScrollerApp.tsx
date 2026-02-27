@@ -65,6 +65,15 @@ export function ScrollerApp() {
     };
 
     const scrollContainer = getScrollParent(el);
+
+    if (index >= domArticles.length) {
+      scrollContainer.scrollTo({
+        top: scrollContainer === window ? document.documentElement.scrollHeight : (scrollContainer as Element).scrollHeight,
+        behavior: 'instant'
+      });
+      return;
+    }
+
     const rectTop = el.getBoundingClientRect().top;
     
     // We want the element's top to hit the focal point perfectly.
@@ -148,6 +157,9 @@ export function ScrollerApp() {
 
     // Setup keyboard shortcuts
     const onKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept OS-level navigation like Cmd+Up (Home) or Cmd+Down (End) on Mac, or Ctrl+Home on Windows
+      if (e.metaKey || e.ctrlKey) return;
+
       if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName || '')) return;
       if ((document.activeElement as HTMLElement)?.isContentEditable) return;
 
