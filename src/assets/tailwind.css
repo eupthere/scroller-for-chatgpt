@@ -1,1 +1,9 @@
 @import "tailwindcss";
+
+@theme {
+  --color-scroller-dot-active: var(--color-green-600);
+  --color-scroller-dot-idle: var(--color-gray-400);
+  --color-scroller-dot-idle-hover: var(--color-gray-600);
+  --color-scroller-focus-outline: color-mix(in srgb, var(--color-scroller-dot-active) 50%, transparent);
+  --color-scroller-focus-outline-clear: transparent;
+}

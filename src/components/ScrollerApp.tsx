@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Timeline } from './Timeline';
-import type { ViewportArticle } from './Timeline';
+import { normalizeRole } from '../lib/normalizeRole';
+import type { ViewportArticle } from '../types/timeline';
 
 export function ScrollerApp() {
   const [articles, setArticles] = useState<ViewportArticle[]>([]);
@@ -95,12 +96,12 @@ export function ScrollerApp() {
       });
     }
 
-    el.style.outline = '2px solid rgba(16, 163, 127, 0.5)';
+    el.style.outline = '2px solid var(--color-scroller-focus-outline)';
     el.style.outlineOffset = '4px';
     el.style.transition = 'outline 0.3s ease-out';
 
     outlineTimeoutRef.current = setTimeout(() => {
-      el.style.outline = '2px solid transparent';
+      el.style.outline = '2px solid var(--color-scroller-focus-outline-clear)';
       setTimeout(() => {
         el.style.outline = '';
         el.style.outlineOffset = '';
@@ -119,9 +120,16 @@ export function ScrollerApp() {
       const elements = Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="conversation-turn"]'));
       domArticlesRef.current = elements;
       
-      const newArticles = elements.map(article => ({
-        role: article.getAttribute('data-turn') || article.querySelector('[data-message-author-role]')?.getAttribute('data-message-author-role')
-      }));
+      const newArticles = elements.map((article): ViewportArticle => {
+        const roleFromTurn = article.getAttribute('data-turn');
+        const roleFromAuthor = article
+          .querySelector('[data-message-author-role]')
+          ?.getAttribute('data-message-author-role');
+
+        return {
+          role: normalizeRole(roleFromTurn ?? roleFromAuthor)
+        };
+      });
       
       setArticles(newArticles);
       syncIndexWithScroll();

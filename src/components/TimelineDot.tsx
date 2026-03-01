@@ -1,7 +1,8 @@
 import React from 'react';
+import type { Role } from '../types/timeline';
 
 export interface TimelineDotProps {
-  role?: string | null;
+  role: Role | null;
   isActive: boolean;
   onClick: () => void;
 }
@@ -11,9 +12,9 @@ export function TimelineDot({ role, isActive, onClick }: TimelineDotProps) {
   let classes = 'w-[10px] h-[10px] cursor-pointer transition-all duration-200 hover:scale-150 chatgpt-scroller-dot'; // Removed background color as it depends on active state
 
   if (isActive) {
-    classes += ' bg-[#10a37f] scale-125';
+    classes += ' bg-scroller-dot-active scale-125';
   } else {
-    classes += ' bg-[#ccc] hover:bg-[#888]';
+    classes += ' bg-scroller-dot-idle hover:bg-scroller-dot-idle-hover';
   }
 
   // Check if it's a user or assistant message

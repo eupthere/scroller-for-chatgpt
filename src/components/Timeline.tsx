@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { TimelineDot } from './TimelineDot';
 
 export interface ViewportArticle {
-  role?: string | null;
+  role: 'user' | 'assistant' | null;
 }
 
 export interface TimelineProps {
