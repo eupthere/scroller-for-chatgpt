@@ -6,6 +6,7 @@ import {
   ANSWER_MIN_SCALE,
   ANSWER_SCALE_RECOVERY,
   CENTER_Y,
+  CONTENT_OVERLAP_GAP,
   CONNECTOR_BLEND,
   CONNECTOR_HANDLE_RATE,
   CONNECTOR_MAX_DISTANCE,
@@ -20,7 +21,8 @@ import {
   PREVIEW_VERTICAL_BLEED,
   RIGHT_X,
   ROW_HEIGHT,
-  ROW_WIDTH
+  ROW_WIDTH,
+  TIMELINE_COLLAPSED_WIDTH
 } from './timelineUi';
 
 interface TimelineProps {
@@ -133,6 +135,7 @@ function getDotScale(isHighlighted: boolean, isHovered: boolean) {
 
 export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
   const [leftOffset, setLeftOffset] = useState(16);
+  const [isLayoutVisible, setIsLayoutVisible] = useState(true);
   const [animation, setAnimation] = useState<{ answerId: string; progress: number } | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [isTimelineHovered, setIsTimelineHovered] = useState(false);
@@ -183,12 +186,41 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
   }, [dotScales]);
 
   useEffect(() => {
+    const getContentLeftBoundary = () => {
+      const contentNodes = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-testid^="conversation-turn"] [data-message-author-role]')
+      );
+      let minLeft = Number.POSITIVE_INFINITY;
+
+      for (const node of contentNodes) {
+        const rect = node.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) continue;
+        if (rect.bottom < 0 || rect.top > window.innerHeight) continue;
+        minLeft = Math.min(minLeft, rect.left);
+      }
+
+      return minLeft;
+    };
+
     const updatePosition = () => {
       const thread = document.getElementById('thread');
       if (thread) {
         const rect = thread.getBoundingClientRect();
         const targetLeft = Math.max(16, rect.left + 16);
+        const timelineRight = targetLeft + TIMELINE_COLLAPSED_WIDTH;
+        const contentLeft = getContentLeftBoundary();
+        const doesOverlapContent =
+          Number.isFinite(contentLeft) && timelineRight + CONTENT_OVERLAP_GAP > contentLeft;
+
+        if (doesOverlapContent) {
+          setIsLayoutVisible(false);
+          return;
+        }
+
+        setIsLayoutVisible(true);
         setLeftOffset(targetLeft);
+      } else {
+        setIsLayoutVisible(false);
       }
     };
 
@@ -360,7 +392,7 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
     };
   }, [activeIndex, hoveredIndex, articles]);
 
-  if (articles.length === 0) return null;
+  if (articles.length === 0 || !isLayoutVisible) return null;
 
   return (
     <div
