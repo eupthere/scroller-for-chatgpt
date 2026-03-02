@@ -229,14 +229,16 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
     };
 
     animationRafRef.current = requestAnimationFrame(tick);
+  }, [articles]);
 
+  useEffect(() => {
     return () => {
       if (animationRafRef.current) {
         cancelAnimationFrame(animationRafRef.current);
         animationRafRef.current = null;
       }
     };
-  }, [articles]);
+  }, []);
 
   useEffect(() => {
     const indices = articles.map((_, index) => index);
