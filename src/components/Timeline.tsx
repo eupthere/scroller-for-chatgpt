@@ -140,6 +140,7 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
   const dotScaleRafRef = useRef<number | null>(null);
   const dotScaleRef = useRef<Record<number, number>>({});
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const activeRowRef = useRef<HTMLDivElement | null>(null);
 
   const rows = useMemo<TimelineRow[]>(() => {
     const out: TimelineRow[] = [];
@@ -231,6 +232,33 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
       observer.disconnect();
     };
   }, [rows, maxHeightPx]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const activeRow = activeRowRef.current;
+    if (!container || !activeRow) return;
+
+    const containerTop = container.scrollTop;
+    const containerBottom = containerTop + container.clientHeight;
+    const rowTop = activeRow.offsetTop;
+    const rowBottom = rowTop + activeRow.offsetHeight;
+    const padding = 8;
+
+    if (rowTop < containerTop + padding) {
+      container.scrollTo({
+        top: Math.max(0, rowTop - padding),
+        behavior: 'smooth'
+      });
+      return;
+    }
+
+    if (rowBottom > containerBottom - padding) {
+      container.scrollTo({
+        top: rowBottom - container.clientHeight + padding,
+        behavior: 'smooth'
+      });
+    }
+  }, [activeIndex, rows, isScrollable]);
 
   useEffect(() => {
     const previousIds = new Set(prevArticleIdsRef.current);
@@ -334,7 +362,7 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
     <div
       ref={containerRef}
       id="chatgpt-scroller-timeline"
-      className={`fixed top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[9999] pointer-events-auto p-2.5 bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-2xl opacity-30 hover:opacity-100 transition-opacity duration-300 overflow-x-hidden chatgpt-scroller-scroll ${
+      className={`fixed top-1/2 -translate-y-1/2 flex flex-col gap-2 z-20 pointer-events-auto p-2.5 bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-2xl opacity-30 hover:opacity-100 transition-opacity duration-300 overflow-x-hidden chatgpt-scroller-scroll ${
         isScrollable ? 'overflow-y-auto' : 'overflow-y-visible'
       }`}
       style={{ left: `${leftOffset}px`, maxHeight: maxHeightPx > 0 ? `${maxHeightPx}px` : undefined }}
@@ -369,7 +397,12 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
           row.answer?.index === hoveredIndex;
 
         return (
-          <div key={row.key} className="relative shrink-0" style={{ width: ROW_WIDTH, height: ROW_HEIGHT }}>
+          <div
+            key={row.key}
+            ref={rowIsActive ? activeRowRef : null}
+            className="relative shrink-0"
+            style={{ width: ROW_WIDTH, height: ROW_HEIGHT }}
+          >
             {connectorPath && (
               <svg
                 width={ROW_WIDTH}

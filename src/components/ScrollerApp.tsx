@@ -3,13 +3,50 @@ import { Timeline } from './Timeline';
 import { normalizeRole } from '../lib/normalizeRole';
 import type { ViewportArticle } from '../types/timeline';
 
+function getVisibilityState() {
+  const pathname = window.location.pathname;
+  const chatMatch = pathname.match(/^\/c\/([^/]+)/);
+  return {
+    isHashOpen: window.location.hash.length > 1,
+    isChatRoute: Boolean(chatMatch),
+    chatId: chatMatch?.[1] ?? null
+  };
+}
+
 export function ScrollerApp() {
   const [articles, setArticles] = useState<ViewportArticle[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [visibilityState, setVisibilityState] = useState(getVisibilityState);
   const domArticlesRef = useRef<HTMLElement[]>([]);
   
   // Track current outline clear timeout
   const outlineTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const updateVisibilityState = () => {
+      setVisibilityState(getVisibilityState());
+    };
+
+    let previousHref = window.location.href;
+    const interval = window.setInterval(() => {
+      if (window.location.href !== previousHref) {
+        previousHref = window.location.href;
+        updateVisibilityState();
+      }
+    }, 250);
+
+    window.addEventListener('hashchange', updateVisibilityState);
+    window.addEventListener('popstate', updateVisibilityState);
+    updateVisibilityState();
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('hashchange', updateVisibilityState);
+      window.removeEventListener('popstate', updateVisibilityState);
+    };
+  }, []);
+
+  const shouldHideTimeline = visibilityState.isHashOpen || !visibilityState.isChatRoute;
 
   // Calculate the current active index directly from DOM
   const getCurrentVisibleIndex = useCallback((): number => {
@@ -113,6 +150,13 @@ export function ScrollerApp() {
 
   // --- Event Listeners ---
   useEffect(() => {
+    if (shouldHideTimeline) {
+      setActiveIndex(-1);
+      setArticles([]);
+      domArticlesRef.current = [];
+      return;
+    }
+
     let updateTimeout: ReturnType<typeof setTimeout>;
 
     const updateArticles = () => {
@@ -204,8 +248,11 @@ export function ScrollerApp() {
       document.removeEventListener('scroll', onScroll, { capture: true });
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [getCurrentVisibleIndex, syncIndexWithScroll, focusArticle]);
+  }, [getCurrentVisibleIndex, syncIndexWithScroll, focusArticle, shouldHideTimeline, visibilityState.chatId]);
 
+  if (shouldHideTimeline) {
+    return null;
+  }
 
   return (
     <Timeline 
