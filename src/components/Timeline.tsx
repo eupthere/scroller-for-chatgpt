@@ -17,6 +17,7 @@ import {
   MAX_HEIGHT_PERCENT,
   PREVIEW_GAP,
   PREVIEW_MAX_WIDTH,
+  PREVIEW_VERTICAL_BLEED,
   RIGHT_X,
   ROW_HEIGHT,
   ROW_WIDTH
@@ -372,7 +373,12 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
       <div
         ref={scrollContainerRef}
         className={`flex flex-col gap-2 chatgpt-scroller-scroll ${isScrollable ? 'overflow-y-auto' : 'overflow-y-visible'}`}
-        style={{ maxHeight: maxHeightPx > 0 ? `${maxHeightPx}px` : undefined, direction: 'rtl' }}
+        style={{
+          maxHeight: maxHeightPx > 0 ? `${maxHeightPx}px` : undefined,
+          direction: 'rtl',
+          paddingTop: `${PREVIEW_VERTICAL_BLEED}px`,
+          paddingBottom: `${PREVIEW_VERTICAL_BLEED}px`
+        }}
       >
         {rows.map((row) => {
           const hasPair = row.question?.article.role === 'user' && row.answer?.article.role === 'assistant';

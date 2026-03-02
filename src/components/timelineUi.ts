@@ -27,3 +27,4 @@ export const MAX_HEIGHT_PERCENT = 70;
 
 export const PREVIEW_GAP = 10;
 export const PREVIEW_MAX_WIDTH = 280;
+export const PREVIEW_VERTICAL_BLEED = 8;
