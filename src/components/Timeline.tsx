@@ -133,6 +133,77 @@ function getDotScale(isHighlighted: boolean, isHovered: boolean) {
   return Math.max(highlightScale, hoverScale);
 }
 
+function getMessageTextFromTurn(turnElement: HTMLElement | null) {
+  if (!turnElement) return '';
+  const authorRoot = turnElement.querySelector<HTMLElement>('[data-message-author-role]');
+  const text = authorRoot?.innerText ?? turnElement.innerText ?? '';
+  return text.replace(/\u00a0/g, ' ').trim();
+}
+
+async function writeClipboardText(text: string) {
+  if (!navigator.clipboard?.writeText) return false;
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function copyUsingTurnCopyButton(turnElement: HTMLElement | null): Promise<string> {
+  if (!turnElement) return '';
+
+  const copyButton = turnElement.querySelector<HTMLButtonElement>(
+    'button[data-testid="copy-turn-action-button"][aria-label="Copy"]'
+  );
+
+  if (!copyButton || !navigator.clipboard?.readText) {
+    return getMessageTextFromTurn(turnElement);
+  }
+
+  let before = '';
+  try {
+    before = await navigator.clipboard.readText();
+  } catch {
+    return getMessageTextFromTurn(turnElement);
+  }
+
+  copyButton.click();
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    try {
+      const current = await navigator.clipboard.readText();
+      if (current && current !== before) return current.trim();
+    } catch {
+      break;
+    }
+  }
+
+  return getMessageTextFromTurn(turnElement);
+}
+
+function CopyIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="shrink-0"
+      aria-hidden="true"
+    >
+      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </svg>
+  );
+}
+
 export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
   const [leftOffset, setLeftOffset] = useState(16);
   const [isLayoutVisible, setIsLayoutVisible] = useState(true);
@@ -142,9 +213,11 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
   const [dotScales, setDotScales] = useState<Record<number, number>>({});
   const [maxHeightPx, setMaxHeightPx] = useState(0);
   const [isScrollable, setIsScrollable] = useState(false);
+  const [copiedRowKey, setCopiedRowKey] = useState<string | null>(null);
   const prevArticleIdsRef = useRef<string[]>([]);
   const animationRafRef = useRef<number | null>(null);
   const dotScaleRafRef = useRef<number | null>(null);
+  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dotScaleRef = useRef<Record<number, number>>({});
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const activeRowRef = useRef<HTMLDivElement | null>(null);
@@ -338,6 +411,10 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
         cancelAnimationFrame(animationRafRef.current);
         animationRafRef.current = null;
       }
+      if (copiedTimeoutRef.current) {
+        clearTimeout(copiedTimeoutRef.current);
+        copiedTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -394,6 +471,28 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
 
   if (articles.length === 0 || !isLayoutVisible) return null;
 
+  const handlePreviewCopy = async (row: TimelineRow) => {
+    const domTurns = Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="conversation-turn"]'));
+    const questionTurn = row.question ? domTurns[row.question.index] : null;
+    const answerTurn = row.answer ? domTurns[row.answer.index] : null;
+
+    const questionText = row.question ? await copyUsingTurnCopyButton(questionTurn) : '';
+    const answerText = row.answer ? await copyUsingTurnCopyButton(answerTurn) : '';
+
+    const formatted = `# Question\n${questionText}\n\n# Answer\n${answerText}`;
+    const didCopy = await writeClipboardText(formatted);
+    if (!didCopy) return;
+
+    setCopiedRowKey(row.key);
+    if (copiedTimeoutRef.current) {
+      clearTimeout(copiedTimeoutRef.current);
+    }
+    copiedTimeoutRef.current = setTimeout(() => {
+      setCopiedRowKey((current) => (current === row.key ? null : current));
+      copiedTimeoutRef.current = null;
+    }, 2000);
+  };
+
   return (
     <div
       id="chatgpt-scroller-timeline"
@@ -402,6 +501,14 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
       onMouseEnter={() => setIsTimelineHovered(true)}
       onMouseLeave={() => setIsTimelineHovered(false)}
     >
+      <style>
+        {`
+          @keyframes chatgpt-scroller-shine {
+            0% { transform: translateX(-120%); }
+            100% { transform: translateX(220%); }
+          }
+        `}
+      </style>
       <div
         ref={scrollContainerRef}
         className={`flex flex-col gap-2 chatgpt-scroller-scroll ${isScrollable ? 'overflow-y-auto' : 'overflow-y-visible'}`}
@@ -452,16 +559,35 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
                 direction: 'ltr'
               }}
             >
-              {row.question?.article.previewHtml && (
+              {row.question?.article.previewText && (
                 <div
-                  className={`absolute top-1/2 -translate-y-1/2 pointer-events-none transition-opacity duration-150 ${
+                  className={`absolute top-1/2 -translate-y-1/2 transition-opacity duration-150 ${
                     isTimelineHovered ? 'opacity-100' : 'opacity-0'
                   }`}
                   style={{ left: `${ROW_WIDTH + PREVIEW_GAP}px` }}
                 >
-                  <div className="max-w-[280px] truncate rounded-md bg-black/70 px-2 py-1 text-[11px] leading-tight text-white">
-                    <span dangerouslySetInnerHTML={{ __html: row.question.article.previewHtml }} />
-                  </div>
+                  <button
+                    type="button"
+                    className="relative flex max-w-[280px] items-center gap-1.5 overflow-hidden rounded-md bg-black/70 px-2 py-1 text-[11px] leading-tight text-white transition-colors hover:bg-black/80"
+                    onClick={() => void handlePreviewCopy(row)}
+                    title="Copy question + answer"
+                  >
+                    <CopyIcon />
+                    <span className="truncate">{row.question.article.previewText}</span>
+                    {copiedRowKey === row.key && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-emerald-600/85 text-[10px] font-semibold tracking-wide text-white">
+                        Copied
+                        <span
+                          className="pointer-events-none absolute inset-0 opacity-70"
+                          style={{
+                            background:
+                              'linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%)',
+                            animation: 'chatgpt-scroller-shine 1s linear infinite'
+                          }}
+                        />
+                      </span>
+                    )}
+                  </button>
                 </div>
               )}
 

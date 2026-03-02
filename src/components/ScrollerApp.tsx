@@ -8,39 +8,12 @@ const BLOCK_ELEMENTS = new Set([
   'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
   'header', 'hr', 'li', 'main', 'nav', 'ol', 'p', 'pre', 'section', 'table', 'ul'
 ]);
-const INLINE_FORMAT_ELEMENTS = new Set(['strong', 'b', 'em', 'i', 'code', 's', 'u']);
 
-function escapeHtml(text: string) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+function hasVisibleText(text: string) {
+  return text.replace(/\u00a0/g, ' ').trim().length > 0;
 }
 
-function hasVisibleText(html: string) {
-  return html.replace(/<[^>]*>/g, '').replace(/\u00a0/g, ' ').trim().length > 0;
-}
-
-function extractInlineHtml(node: Node): string {
-  if (node.nodeType === Node.TEXT_NODE) {
-    const text = (node.textContent ?? '').replace(/\r/g, '').replace(/\n+/g, ' ');
-    return escapeHtml(text);
-  }
-
-  if (!(node instanceof HTMLElement)) return '';
-
-  const tag = node.tagName.toLowerCase();
-  if (tag === 'pre') return '';
-  if (tag === 'br') return ' ';
-
-  const inner = Array.from(node.childNodes).map(extractInlineHtml).join('');
-  if (!inner.trim()) return '';
-  if (INLINE_FORMAT_ELEMENTS.has(tag)) {
-    return `<${tag}>${inner}</${tag}>`;
-  }
-  return inner;
-}
-
-function extractLastQuestionSentenceHtml(turnElement: HTMLElement): string | null {
+function extractLastQuestionSentenceText(turnElement: HTMLElement): string | null {
   const authorRoot = turnElement.querySelector<HTMLElement>('[data-message-author-role="user"]');
   if (!authorRoot) return null;
 
@@ -51,14 +24,14 @@ function extractLastQuestionSentenceHtml(turnElement: HTMLElement): string | nul
   let currentLine = '';
 
   const pushLine = () => {
-    lines.push(currentLine.trim());
+    lines.push(currentLine.replace(/\s+/g, ' ').trim());
     currentLine = '';
   };
 
   const appendText = (text: string) => {
     const parts = text.replace(/\r/g, '').split('\n');
     for (let i = 0; i < parts.length; i += 1) {
-      currentLine += escapeHtml(parts[i]);
+      currentLine += parts[i];
       if (i < parts.length - 1) {
         pushLine();
       }
@@ -86,8 +59,7 @@ function extractLastQuestionSentenceHtml(turnElement: HTMLElement): string | nul
       return;
     }
 
-    const inner = extractInlineHtml(node);
-    currentLine += inner;
+    node.childNodes.forEach(walk);
   };
 
   clone.childNodes.forEach(walk);
@@ -269,8 +241,8 @@ export function ScrollerApp() {
         return {
           id: domId || testId || `conversation-turn-${index}`,
           role: normalizeRole(roleFromTurn ?? roleFromAuthor),
-          previewHtml: normalizeRole(roleFromTurn ?? roleFromAuthor) === 'user'
-            ? extractLastQuestionSentenceHtml(article)
+          previewText: normalizeRole(roleFromTurn ?? roleFromAuthor) === 'user'
+            ? extractLastQuestionSentenceText(article)
             : null
         };
       });
@@ -309,7 +281,6 @@ export function ScrollerApp() {
 
     // Setup keyboard shortcuts
     const onKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept OS-level navigation like Cmd+Up (Home) or Cmd+Down (End) on Mac, or Ctrl+Home on Windows
       if (e.metaKey || e.ctrlKey) return;
 
       if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName || '')) return;
@@ -323,6 +294,7 @@ export function ScrollerApp() {
         e.preventDefault();
         const active = getCurrentVisibleIndex();
         focusArticle(active - 1);
+      }
     };
     
     document.addEventListener('keydown', onKeyDown);
