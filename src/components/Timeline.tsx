@@ -15,6 +15,8 @@ import {
   DOT_RADIUS,
   LEFT_X,
   MAX_HEIGHT_PERCENT,
+  PREVIEW_GAP,
+  PREVIEW_MAX_WIDTH,
   RIGHT_X,
   ROW_HEIGHT,
   ROW_WIDTH
@@ -132,6 +134,7 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
   const [leftOffset, setLeftOffset] = useState(16);
   const [animation, setAnimation] = useState<{ answerId: string; progress: number } | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [isTimelineHovered, setIsTimelineHovered] = useState(false);
   const [dotScales, setDotScales] = useState<Record<number, number>>({});
   const [maxHeightPx, setMaxHeightPx] = useState(0);
   const [isScrollable, setIsScrollable] = useState(false);
@@ -139,7 +142,7 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
   const animationRafRef = useRef<number | null>(null);
   const dotScaleRafRef = useRef<number | null>(null);
   const dotScaleRef = useRef<Record<number, number>>({});
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const activeRowRef = useRef<HTMLDivElement | null>(null);
 
   const rows = useMemo<TimelineRow[]>(() => {
@@ -217,9 +220,9 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
   }, []);
 
   useEffect(() => {
-    if (!containerRef.current || maxHeightPx <= 0) return;
+    if (!scrollContainerRef.current || maxHeightPx <= 0) return;
 
-    const container = containerRef.current;
+    const container = scrollContainerRef.current;
     const updateScrollable = () => {
       setIsScrollable(container.scrollHeight > maxHeightPx);
     };
@@ -234,7 +237,7 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
   }, [rows, maxHeightPx]);
 
   useEffect(() => {
-    const container = containerRef.current;
+    const container = scrollContainerRef.current;
     const activeRow = activeRowRef.current;
     if (!container || !activeRow) return;
 
@@ -360,98 +363,120 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
 
   return (
     <div
-      ref={containerRef}
       id="chatgpt-scroller-timeline"
-      className={`fixed top-1/2 -translate-y-1/2 flex flex-col gap-2 z-20 pointer-events-auto p-2.5 bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-2xl opacity-30 hover:opacity-100 transition-opacity duration-300 overflow-x-hidden chatgpt-scroller-scroll ${
-        isScrollable ? 'overflow-y-auto' : 'overflow-y-visible'
-      }`}
-      style={{ left: `${leftOffset}px`, maxHeight: maxHeightPx > 0 ? `${maxHeightPx}px` : undefined }}
+      className="fixed top-1/2 -translate-y-1/2 z-20 pointer-events-auto p-2.5 bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-2xl opacity-30 hover:opacity-100 transition-opacity duration-300 overflow-visible"
+      style={{ left: `${leftOffset}px` }}
+      onMouseEnter={() => setIsTimelineHovered(true)}
+      onMouseLeave={() => setIsTimelineHovered(false)}
     >
-      {rows.map((row) => {
-        const hasPair = row.question?.article.role === 'user' && row.answer?.article.role === 'assistant';
-        const shouldAnimateAnswer = hasPair && animation?.answerId === row.answer?.article.id;
-        const raw = shouldAnimateAnswer ? Math.max(0, animation?.progress ?? 0) : 1;
-        const moveT = shouldAnimateAnswer ? easeOutCubic(raw) : 1;
-        const bornScale = shouldAnimateAnswer
-          ? ANSWER_MIN_SCALE + ANSWER_SCALE_RECOVERY * easeOutBack(raw)
-          : 1;
-        const animatedAnswerX = LEFT_X + (RIGHT_X - LEFT_X) * moveT;
-        const questionScale = row.question ? (dotScales[row.question.index] ?? 1) : 1;
-        const answerBaseScale = row.answer ? (dotScales[row.answer.index] ?? 1) : 1;
-        const answerScale = answerBaseScale * bornScale;
-        const connectorPath = hasPair
-          ? metaballPath(
-              { x: LEFT_X, y: CENTER_Y, r: DOT_RADIUS * questionScale },
-              {
-                x: shouldAnimateAnswer ? animatedAnswerX : RIGHT_X,
-                y: CENTER_Y,
-                r: DOT_RADIUS * answerScale
-              }
-            )
-          : null;
-        const rowIsActive =
-          row.question?.index === activeIndex ||
-          row.answer?.index === activeIndex;
-        const rowIsHovered =
-          row.question?.index === hoveredIndex ||
-          row.answer?.index === hoveredIndex;
+      <div
+        ref={scrollContainerRef}
+        className={`flex flex-col gap-2 chatgpt-scroller-scroll ${isScrollable ? 'overflow-y-auto' : 'overflow-y-visible'}`}
+        style={{ maxHeight: maxHeightPx > 0 ? `${maxHeightPx}px` : undefined, direction: 'rtl' }}
+      >
+        {rows.map((row) => {
+          const hasPair = row.question?.article.role === 'user' && row.answer?.article.role === 'assistant';
+          const shouldAnimateAnswer = hasPair && animation?.answerId === row.answer?.article.id;
+          const raw = shouldAnimateAnswer ? Math.max(0, animation?.progress ?? 0) : 1;
+          const moveT = shouldAnimateAnswer ? easeOutCubic(raw) : 1;
+          const bornScale = shouldAnimateAnswer
+            ? ANSWER_MIN_SCALE + ANSWER_SCALE_RECOVERY * easeOutBack(raw)
+            : 1;
+          const animatedAnswerX = LEFT_X + (RIGHT_X - LEFT_X) * moveT;
+          const questionScale = row.question ? (dotScales[row.question.index] ?? 1) : 1;
+          const answerBaseScale = row.answer ? (dotScales[row.answer.index] ?? 1) : 1;
+          const answerScale = answerBaseScale * bornScale;
+          const connectorPath = hasPair
+            ? metaballPath(
+                { x: LEFT_X, y: CENTER_Y, r: DOT_RADIUS * questionScale },
+                {
+                  x: shouldAnimateAnswer ? animatedAnswerX : RIGHT_X,
+                  y: CENTER_Y,
+                  r: DOT_RADIUS * answerScale
+                }
+              )
+            : null;
+          const rowIsActive =
+            row.question?.index === activeIndex ||
+            row.answer?.index === activeIndex;
+          const rowIsHovered =
+            row.question?.index === hoveredIndex ||
+            row.answer?.index === hoveredIndex;
 
-        return (
-          <div
-            key={row.key}
-            ref={rowIsActive ? activeRowRef : null}
-            className="relative shrink-0"
-            style={{ width: ROW_WIDTH, height: ROW_HEIGHT }}
-          >
-            {connectorPath && (
-              <svg
-                width={ROW_WIDTH}
-                height={ROW_HEIGHT}
-                viewBox={`0 0 ${ROW_WIDTH} ${ROW_HEIGHT}`}
-                className={"absolute left-0 top-0 z-10 overflow-visible pointer-events-none fill-scroller-dot-idle"}
-                aria-hidden="true"
-              >
-                <path d={connectorPath} />
-              </svg>
-            )}
+          return (
+            <div
+              key={row.key}
+              ref={rowIsActive ? activeRowRef : null}
+              className="relative shrink-0"
+              style={{
+                width: isTimelineHovered ? ROW_WIDTH + PREVIEW_GAP + PREVIEW_MAX_WIDTH : ROW_WIDTH,
+                height: ROW_HEIGHT,
+                direction: 'ltr'
+              }}
+            >
+              {row.question?.article.previewHtml && (
+                <div
+                  className={`absolute top-1/2 -translate-y-1/2 pointer-events-none transition-opacity duration-150 ${
+                    isTimelineHovered ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  style={{ left: `${ROW_WIDTH + PREVIEW_GAP}px` }}
+                >
+                  <div className="max-w-[280px] truncate rounded-md bg-black/70 px-2 py-1 text-[11px] leading-tight text-white">
+                    <span dangerouslySetInnerHTML={{ __html: row.question.article.previewHtml }} />
+                  </div>
+                </div>
+              )}
 
-            {row.question && (
-              <TimelineDot
-                role={row.question.article.role}
-                isHighlighted={row.question.index === activeIndex}
-                scale={questionScale}
-                onClick={() => onDotClick(row.question!.index)}
-                onHoverChange={(isHovered) => {
-                  setHoveredIndex((current) => {
-                    if (isHovered) return row.question!.index;
-                    return current === row.question!.index ? null : current;
-                  });
-                }}
-                style={{ left: `${LEFT_X - DOT_RADIUS}px`, top: `${CENTER_Y - DOT_RADIUS}px` }}
-              />
-            )}
+              {connectorPath && (
+                <svg
+                  width={ROW_WIDTH}
+                  height={ROW_HEIGHT}
+                  viewBox={`0 0 ${ROW_WIDTH} ${ROW_HEIGHT}`}
+                  className={"absolute left-0 top-0 z-10 overflow-visible pointer-events-none fill-scroller-dot-idle"}
+                  aria-hidden="true"
+                >
+                  <path d={connectorPath} />
+                </svg>
+              )}
 
-            {row.answer && (
-              <TimelineDot
-                role={row.answer.article.role}
-                isHighlighted={row.answer.index === activeIndex}
-                scale={answerScale}
-                onClick={() => onDotClick(row.answer!.index)}
-                onHoverChange={(isHovered) => {
-                  setHoveredIndex((current) => {
-                    if (isHovered) return row.answer!.index;
-                    return current === row.answer!.index ? null : current;
-                  });
-                }}
-                style={{
-                  left: `${(shouldAnimateAnswer ? animatedAnswerX : RIGHT_X) - DOT_RADIUS}px`,
-                  top: `${CENTER_Y - DOT_RADIUS}px`
-                }}
-              />
-            )}
-          </div>
-        );
-      })}
+              {row.question && (
+                <TimelineDot
+                  role={row.question.article.role}
+                  isHighlighted={row.question.index === activeIndex}
+                  scale={questionScale}
+                  onClick={() => onDotClick(row.question!.index)}
+                  onHoverChange={(isHovered) => {
+                    setHoveredIndex((current) => {
+                      if (isHovered) return row.question!.index;
+                      return current === row.question!.index ? null : current;
+                    });
+                  }}
+                  style={{ left: `${LEFT_X - DOT_RADIUS}px`, top: `${CENTER_Y - DOT_RADIUS}px` }}
+                />
+              )}
+
+              {row.answer && (
+                <TimelineDot
+                  role={row.answer.article.role}
+                  isHighlighted={row.answer.index === activeIndex}
+                  scale={answerScale}
+                  onClick={() => onDotClick(row.answer!.index)}
+                  onHoverChange={(isHovered) => {
+                    setHoveredIndex((current) => {
+                      if (isHovered) return row.answer!.index;
+                      return current === row.answer!.index ? null : current;
+                    });
+                  }}
+                  style={{
+                    left: `${(shouldAnimateAnswer ? animatedAnswerX : RIGHT_X) - DOT_RADIUS}px`,
+                    top: `${CENTER_Y - DOT_RADIUS}px`
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

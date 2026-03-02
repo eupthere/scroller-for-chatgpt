@@ -3,6 +3,100 @@ import { Timeline } from './Timeline';
 import { normalizeRole } from '../lib/normalizeRole';
 import type { ViewportArticle } from '../types/timeline';
 
+const BLOCK_ELEMENTS = new Set([
+  'address', 'article', 'aside', 'blockquote', 'dd', 'div', 'dl', 'dt', 'fieldset',
+  'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'header', 'hr', 'li', 'main', 'nav', 'ol', 'p', 'pre', 'section', 'table', 'ul'
+]);
+const INLINE_FORMAT_ELEMENTS = new Set(['strong', 'b', 'em', 'i', 'code', 's', 'u']);
+
+function escapeHtml(text: string) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function hasVisibleText(html: string) {
+  return html.replace(/<[^>]*>/g, '').replace(/\u00a0/g, ' ').trim().length > 0;
+}
+
+function extractInlineHtml(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const text = (node.textContent ?? '').replace(/\r/g, '').replace(/\n+/g, ' ');
+    return escapeHtml(text);
+  }
+
+  if (!(node instanceof HTMLElement)) return '';
+
+  const tag = node.tagName.toLowerCase();
+  if (tag === 'pre') return '';
+  if (tag === 'br') return ' ';
+
+  const inner = Array.from(node.childNodes).map(extractInlineHtml).join('');
+  if (!inner.trim()) return '';
+  if (INLINE_FORMAT_ELEMENTS.has(tag)) {
+    return `<${tag}>${inner}</${tag}>`;
+  }
+  return inner;
+}
+
+function extractLastQuestionSentenceHtml(turnElement: HTMLElement): string | null {
+  const authorRoot = turnElement.querySelector<HTMLElement>('[data-message-author-role="user"]');
+  if (!authorRoot) return null;
+
+  const clone = authorRoot.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll('pre').forEach((el) => el.remove());
+
+  const lines: string[] = [];
+  let currentLine = '';
+
+  const pushLine = () => {
+    lines.push(currentLine.trim());
+    currentLine = '';
+  };
+
+  const appendText = (text: string) => {
+    const parts = text.replace(/\r/g, '').split('\n');
+    for (let i = 0; i < parts.length; i += 1) {
+      currentLine += escapeHtml(parts[i]);
+      if (i < parts.length - 1) {
+        pushLine();
+      }
+    }
+  };
+
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      appendText(node.textContent ?? '');
+      return;
+    }
+
+    if (!(node instanceof HTMLElement)) return;
+
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'pre') return;
+    if (tag === 'br') {
+      pushLine();
+      return;
+    }
+
+    if (BLOCK_ELEMENTS.has(tag)) {
+      node.childNodes.forEach(walk);
+      pushLine();
+      return;
+    }
+
+    const inner = extractInlineHtml(node);
+    currentLine += inner;
+  };
+
+  clone.childNodes.forEach(walk);
+  pushLine();
+
+  const filtered = lines.filter(hasVisibleText);
+  return filtered.length ? filtered[filtered.length - 1] : null;
+}
+
 function getVisibilityState() {
   const pathname = window.location.pathname;
   const chatMatch = pathname.match(/^\/c\/([^/]+)/);
@@ -174,7 +268,10 @@ export function ScrollerApp() {
 
         return {
           id: domId || testId || `conversation-turn-${index}`,
-          role: normalizeRole(roleFromTurn ?? roleFromAuthor)
+          role: normalizeRole(roleFromTurn ?? roleFromAuthor),
+          previewHtml: normalizeRole(roleFromTurn ?? roleFromAuthor) === 'user'
+            ? extractLastQuestionSentenceHtml(article)
+            : null
         };
       });
       

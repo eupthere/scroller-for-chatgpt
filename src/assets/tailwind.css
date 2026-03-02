@@ -10,7 +10,7 @@
 
 .chatgpt-scroller-scroll {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--color-scroller-dot-idle) 55%, transparent) transparent;
+  scrollbar-color: transparent transparent;
   scrollbar-gutter: stable;
 }
 
@@ -25,7 +25,11 @@
 
 .chatgpt-scroller-scroll::-webkit-scrollbar-thumb {
   border-radius: 9999px;
-  background: color-mix(in srgb, var(--color-scroller-dot-idle) 50%, transparent);
+  background: transparent;
+}
+
+.chatgpt-scroller-scroll:hover {
+  scrollbar-color: color-mix(in srgb, var(--color-scroller-dot-idle) 55%, transparent) transparent;
 }
 
 .chatgpt-scroller-scroll:hover::-webkit-scrollbar-thumb {
