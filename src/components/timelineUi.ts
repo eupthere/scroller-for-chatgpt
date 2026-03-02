@@ -22,3 +22,5 @@ export const CONNECTOR_MAX_DISTANCE = 40;
 export const ANSWER_APPEAR_DURATION_MS = 360;
 export const ANSWER_MIN_SCALE = 0.45;
 export const ANSWER_SCALE_RECOVERY = 0.55;
+
+export const MAX_HEIGHT_PERCENT = 70;

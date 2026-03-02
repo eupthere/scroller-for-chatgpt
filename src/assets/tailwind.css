@@ -7,3 +7,31 @@
   --color-scroller-focus-outline: color-mix(in srgb, var(--color-scroller-dot-active) 50%, transparent);
   --color-scroller-focus-outline-clear: transparent;
 }
+
+.chatgpt-scroller-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-scroller-dot-idle) 55%, transparent) transparent;
+  scrollbar-gutter: stable;
+}
+
+.chatgpt-scroller-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 0;
+}
+
+.chatgpt-scroller-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chatgpt-scroller-scroll::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-scroller-dot-idle) 50%, transparent);
+}
+
+.chatgpt-scroller-scroll:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-scroller-dot-idle-hover) 55%, transparent);
+}
+
+.chatgpt-scroller-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}

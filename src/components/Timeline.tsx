@@ -14,6 +14,7 @@ import {
   DOT_HOVER_SCALE,
   DOT_RADIUS,
   LEFT_X,
+  MAX_HEIGHT_PERCENT,
   RIGHT_X,
   ROW_HEIGHT,
   ROW_WIDTH
@@ -132,10 +133,13 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
   const [animation, setAnimation] = useState<{ answerId: string; progress: number } | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [dotScales, setDotScales] = useState<Record<number, number>>({});
+  const [maxHeightPx, setMaxHeightPx] = useState(0);
+  const [isScrollable, setIsScrollable] = useState(false);
   const prevArticleIdsRef = useRef<string[]>([]);
   const animationRafRef = useRef<number | null>(null);
   const dotScaleRafRef = useRef<number | null>(null);
   const dotScaleRef = useRef<Record<number, number>>({});
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const rows = useMemo<TimelineRow[]>(() => {
     const out: TimelineRow[] = [];
@@ -194,6 +198,39 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
       clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    const updateMaxHeight = () => {
+      const bodyHeight = document.body.getBoundingClientRect().height || window.innerHeight;
+      setMaxHeightPx((bodyHeight * MAX_HEIGHT_PERCENT) / 100);
+    };
+
+    updateMaxHeight();
+    window.addEventListener('resize', updateMaxHeight);
+    document.addEventListener('scroll', updateMaxHeight, { passive: true, capture: true });
+
+    return () => {
+      window.removeEventListener('resize', updateMaxHeight);
+      document.removeEventListener('scroll', updateMaxHeight, { capture: true });
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!containerRef.current || maxHeightPx <= 0) return;
+
+    const container = containerRef.current;
+    const updateScrollable = () => {
+      setIsScrollable(container.scrollHeight > maxHeightPx);
+    };
+
+    updateScrollable();
+    const observer = new ResizeObserver(updateScrollable);
+    observer.observe(container);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [rows, maxHeightPx]);
 
   useEffect(() => {
     const previousIds = new Set(prevArticleIdsRef.current);
@@ -295,9 +332,12 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
 
   return (
     <div
+      ref={containerRef}
       id="chatgpt-scroller-timeline"
-      className="fixed top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[9999] pointer-events-auto p-2.5 bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-2xl max-h-[80vh] overflow-y-auto opacity-30 hover:opacity-100 transition-opacity duration-300"
-      style={{ left: `${leftOffset}px` }}
+      className={`fixed top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[9999] pointer-events-auto p-2.5 bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-2xl opacity-30 hover:opacity-100 transition-opacity duration-300 overflow-x-hidden chatgpt-scroller-scroll ${
+        isScrollable ? 'overflow-y-auto' : 'overflow-y-visible'
+      }`}
+      style={{ left: `${leftOffset}px`, maxHeight: maxHeightPx > 0 ? `${maxHeightPx}px` : undefined }}
     >
       {rows.map((row) => {
         const hasPair = row.question?.article.role === 'user' && row.answer?.article.role === 'assistant';
@@ -329,7 +369,7 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
           row.answer?.index === hoveredIndex;
 
         return (
-          <div key={row.key} className="relative" style={{ width: ROW_WIDTH, height: ROW_HEIGHT }}>
+          <div key={row.key} className="relative shrink-0" style={{ width: ROW_WIDTH, height: ROW_HEIGHT }}>
             {connectorPath && (
               <svg
                 width={ROW_WIDTH}
