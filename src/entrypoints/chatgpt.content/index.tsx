@@ -8,6 +8,12 @@ export default defineContentScript({
   cssInjectionMode: 'ui',
   async main(ctx) {
     console.log('Scroller for ChatGPT: Content script loaded (React mode)');
+
+    // Dev reload/HMR safety: clean stale mounted hosts before injecting a fresh UI.
+    document.querySelectorAll('chatgpt-scroller-ui').forEach((node) => node.remove());
+    document
+      .querySelectorAll('style[wxt-shadow-root-document-styles]')
+      .forEach((styleNode) => styleNode.remove());
     
     const ui = await createShadowRootUi<Root>(ctx, {
       name: 'chatgpt-scroller-ui',
