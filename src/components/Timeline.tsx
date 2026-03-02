@@ -10,6 +10,7 @@ import {
   CONNECTOR_HANDLE_RATE,
   CONNECTOR_MAX_DISTANCE,
   DOT_ACTIVE_SCALE,
+  DOT_SCALE_ANIMATION_MS,
   DOT_HOVER_SCALE,
   DOT_RADIUS,
   LEFT_X,
@@ -130,8 +131,11 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
   const [leftOffset, setLeftOffset] = useState(16);
   const [animation, setAnimation] = useState<{ answerId: string; progress: number } | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [dotScales, setDotScales] = useState<Record<number, number>>({});
   const prevArticleIdsRef = useRef<string[]>([]);
   const animationRafRef = useRef<number | null>(null);
+  const dotScaleRafRef = useRef<number | null>(null);
+  const dotScaleRef = useRef<Record<number, number>>({});
 
   const rows = useMemo<TimelineRow[]>(() => {
     const out: TimelineRow[] = [];
@@ -164,6 +168,10 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
     }
     return out;
   }, [articles]);
+
+  useEffect(() => {
+    dotScaleRef.current = dotScales;
+  }, [dotScales]);
 
   useEffect(() => {
     const updatePosition = () => {
@@ -230,6 +238,57 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
     };
   }, [articles]);
 
+  useEffect(() => {
+    const indices = articles.map((_, index) => index);
+    const targets: Record<number, number> = {};
+    for (const index of indices) {
+      const isHovered = hoveredIndex === index;
+      const isHighlighted = activeIndex === index;
+      targets[index] = getDotScale(isHighlighted, isHovered);
+    }
+
+    const starts: Record<number, number> = {};
+    for (const index of indices) {
+      starts[index] = dotScaleRef.current[index] ?? targets[index] ?? 1;
+    }
+
+    if (dotScaleRafRef.current) {
+      cancelAnimationFrame(dotScaleRafRef.current);
+      dotScaleRafRef.current = null;
+    }
+
+    const startAt = performance.now();
+    const tick = (now: number) => {
+      const raw = Math.min(1, (now - startAt) / DOT_SCALE_ANIMATION_MS);
+      const eased = easeOutCubic(raw);
+      const next: Record<number, number> = {};
+
+      for (const index of indices) {
+        const from = starts[index];
+        const to = targets[index];
+        next[index] = from + (to - from) * eased;
+      }
+
+      dotScaleRef.current = next;
+      setDotScales(next);
+
+      if (raw < 1) {
+        dotScaleRafRef.current = requestAnimationFrame(tick);
+      } else {
+        dotScaleRafRef.current = null;
+      }
+    };
+
+    dotScaleRafRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (dotScaleRafRef.current) {
+        cancelAnimationFrame(dotScaleRafRef.current);
+        dotScaleRafRef.current = null;
+      }
+    };
+  }, [activeIndex, hoveredIndex, articles]);
+
   if (articles.length === 0) return null;
 
   return (
@@ -247,12 +306,9 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
           ? ANSWER_MIN_SCALE + ANSWER_SCALE_RECOVERY * easeOutBack(raw)
           : 1;
         const animatedAnswerX = LEFT_X + (RIGHT_X - LEFT_X) * moveT;
-        const questionScale = row.question
-          ? getDotScale(row.question.index === activeIndex, row.question.index === hoveredIndex)
-          : 1;
-        const answerScale = row.answer
-          ? getDotScale(row.answer.index === activeIndex, row.answer.index === hoveredIndex) * bornScale
-          : 1;
+        const questionScale = row.question ? (dotScales[row.question.index] ?? 1) : 1;
+        const answerBaseScale = row.answer ? (dotScales[row.answer.index] ?? 1) : 1;
+        const answerScale = answerBaseScale * bornScale;
         const connectorPath = hasPair
           ? metaballPath(
               { x: LEFT_X, y: CENTER_Y, r: DOT_RADIUS * questionScale },

@@ -3,6 +3,7 @@ export const DOT_RADIUS = DOT_SIZE / 2;
 
 export const DOT_HOVER_SCALE = 1.25;
 export const DOT_ACTIVE_SCALE = 1.2;
+export const DOT_SCALE_ANIMATION_MS = 200;
 
 export const ROW_DOT_GAP = 22;
 export const ROW_SIDE_PADDING = 4;

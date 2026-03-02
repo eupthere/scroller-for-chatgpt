@@ -12,7 +12,7 @@ export interface TimelineDotProps {
 }
 
 export function TimelineDot({ role, isHighlighted, scale, onClick, onHoverChange, style }: TimelineDotProps) {
-  let classes = 'absolute cursor-pointer transition-transform duration-200 chatgpt-scroller-dot z-20 border-0 p-0 rounded-full';
+  let classes = 'absolute cursor-pointer transition-colors duration-150 chatgpt-scroller-dot z-20 border-0 p-0 rounded-full';
 
   if (isHighlighted) {
     classes += ' bg-scroller-dot-active';
