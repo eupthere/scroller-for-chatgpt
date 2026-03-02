@@ -323,13 +323,6 @@ export function ScrollerApp() {
         e.preventDefault();
         const active = getCurrentVisibleIndex();
         focusArticle(active - 1);
-      } else if (e.key === 'Home') {
-        e.preventDefault();
-        focusArticle(0);
-      } else if (e.key === 'End') {
-        e.preventDefault();
-        focusArticle(domArticlesRef.current.length - 1);
-      }
     };
     
     document.addEventListener('keydown', onKeyDown);
