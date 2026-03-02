@@ -120,13 +120,16 @@ export function ScrollerApp() {
       const elements = Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="conversation-turn"]'));
       domArticlesRef.current = elements;
       
-      const newArticles = elements.map((article): ViewportArticle => {
+      const newArticles = elements.map((article, index): ViewportArticle => {
         const roleFromTurn = article.getAttribute('data-turn');
         const roleFromAuthor = article
           .querySelector('[data-message-author-role]')
           ?.getAttribute('data-message-author-role');
+        const testId = article.getAttribute('data-testid');
+        const domId = article.id;
 
         return {
+          id: domId || testId || `conversation-turn-${index}`,
           role: normalizeRole(roleFromTurn ?? roleFromAuthor)
         };
       });
