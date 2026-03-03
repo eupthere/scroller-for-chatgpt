@@ -480,7 +480,7 @@ export function Timeline({ articles, activeIndex, onDotClick }: TimelineProps) {
               {row.question?.article.previewText && (
                 <div
                   className={`absolute top-1/2 -translate-y-1/2 transition-opacity duration-150 ${
-                    isTimelineHovered ? 'opacity-100' : 'opacity-0'
+                    isTimelineHovered ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
                   }`}
                   style={{ left: `${ROW_WIDTH + PREVIEW_GAP}px` }}
                 >
