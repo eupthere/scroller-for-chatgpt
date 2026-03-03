@@ -9,9 +9,9 @@ A browser extension that adds a compact timeline navigator to [chatgpt.com](http
 ## Features
 
 - Adds a floating timeline of dots next to the ChatGPT thread.
-- Uses shape + color to distinguish turns:
-  - Rounded square: user message
-  - Circle: assistant message
+- Uses metaball shape distinguish turns:
+  - Left circle: user message
+  - Right circle: assistant message
   - Green dot: currently active message
 - Click any dot to jump directly to that turn.
 - Keyboard navigation:
