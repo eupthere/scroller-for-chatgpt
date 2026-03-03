@@ -8,7 +8,14 @@ export default defineConfig({
     name: "Scroller for ChatGPT",
     description:
       "A browser extension that adds a timeline-style scroll rail to ChatGPT, making long conversations easier to navigate.",
-    version: "0.1.0",
+    version: "0.2.0",
+    browser_specific_settings: {
+      gecko: {
+        data_collection_permissions: {
+          required: ["none"],
+        },
+      },
+    },
   }),
   vite: () => ({
     plugins: [tailwindcss()],
