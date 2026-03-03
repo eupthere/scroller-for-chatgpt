@@ -1,3 +1,7 @@
+
+https://github.com/user-attachments/assets/2a908f9b-949b-461c-b88f-cd44d18b098b
+
+
 # Scroller for ChatGPT
 
 A browser extension that adds a compact timeline navigator to [chatgpt.com](https://chatgpt.com), making long conversations easier to scan and jump through.
