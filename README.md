@@ -1,6 +1,13 @@
 
 https://github.com/user-attachments/assets/2a908f9b-949b-461c-b88f-cd44d18b098b
 
+<a href="https://chromewebstore.google.com/detail/scroller-for-chatgpt/anbhdcmodnbgkpkoooflbfakkknhnbcc">
+  <img src=".github/assets/promo-cws.svg" height="72">
+</a>
+<a href="https://addons.mozilla.org/en-US/firefox/addon/scroller-for-chatgpt/">
+  <img src=".github/assets/promo-fas.svg" height="72">
+</a>
+</br>
 
 # Scroller for ChatGPT
 
